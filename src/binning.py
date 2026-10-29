@@ -32,22 +32,39 @@ def iv_verdict(iv: float) -> str:
     return IV_BANDS[-1][1]
 
 
-def _quantile_edges(x: pd.Series, max_bins: int) -> np.ndarray:
-    """Quantile cut points, de-duplicated. Spiky/zero-inflated columns collapse
-    to fewer bins on their own, which is the correct behaviour."""
+def compute_edges(x: pd.Series, max_bins: int = 6) -> np.ndarray:
+    """Quantile cut points, de-duplicated, fitted on TRAIN ONLY.
+
+    Spiky or zero-inflated columns collapse to fewer bins on their own, which
+    is the correct behaviour — a forced six bins on a column that is 70% zeros
+    produces bins that cannot reproduce out-of-time.
+
+    The edges are returned so the caller can store them. Re-deriving them from
+    validation or test data would give each split its own bins, so the fitted
+    WOE values would be attached to different populations than they were
+    measured on.
+    """
     qs = np.linspace(0, 1, max_bins + 1)
     edges = np.unique(np.nanquantile(x.astype(float), qs))
-    edges[0], edges[-1] = -np.inf, np.inf
+    if len(edges) < 2:                      # degenerate / constant column
+        edges = np.array([-np.inf, np.inf])
+    else:
+        edges[0], edges[-1] = -np.inf, np.inf
     return edges
 
 
-def bin_numeric(x: pd.Series, max_bins: int = 6) -> pd.Series:
+def bin_numeric(x: pd.Series, max_bins: int = 6,
+                edges: np.ndarray | None = None) -> pd.Series:
     """Cut a numeric column into bins; NaN becomes its own labelled bin.
+
+    Pass `edges` from a prior `compute_edges` on train to apply a frozen
+    binning. Omitting `edges` fits new ones, which is correct ONLY on train.
 
     Missing is never imputed. On credit data 'no record' is usually information
     (a thin file), not an inconvenience — give it a bin and let the WOE say so.
     """
-    edges = _quantile_edges(x, max_bins)
+    if edges is None:
+        edges = compute_edges(x, max_bins)
     binned = pd.cut(x.astype(float), bins=edges, duplicates="drop")
     out = binned.astype(object)
     out[x.isna()] = MISSING_LABEL
@@ -152,16 +169,22 @@ def profile_features(df: pd.DataFrame, features: list[str], target_col: str,
     return pd.DataFrame(rows).sort_values("iv", ascending=False, na_position="last")
 
 
-def apply_woe(x: pd.Series, tab: pd.DataFrame, max_bins: int = 6) -> pd.Series:
+def apply_woe(x: pd.Series, tab: pd.DataFrame, max_bins: int = 6,
+              edges: np.ndarray | None = None) -> pd.Series:
     """Transform a raw column into its WOE values using a FITTED table.
 
-    Bins and WOE values must come from train only. Re-fitting on validation or
-    test leaks the target into the transform, which is a quieter version of the
-    same mistake the leakage exclusion list exists to prevent.
+    `edges` must be the ones fitted on train. Without them this re-derives
+    quantiles from whatever data is passed in, so validation gets its own bins
+    and the fitted WOE values end up attached to different cut-points than they
+    were measured on — a quieter version of the same mistake the leakage
+    exclusion list exists to prevent.
+
+    A level unseen in training maps to NaN. The caller decides what that means;
+    `Scorecard` fills it with 0.0, i.e. population-average evidence.
     """
     mapping = dict(zip(tab["bin"].astype(str), tab["woe"]))
     if pd.api.types.is_numeric_dtype(x):
-        bins = bin_numeric(x, max_bins=max_bins)
+        bins = bin_numeric(x, max_bins=max_bins, edges=edges)
     else:
         bins = x.astype(object).where(x.notna(), MISSING_LABEL)
     return bins.astype(str).map(mapping).astype(float)

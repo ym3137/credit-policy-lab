@@ -1,0 +1,5 @@
+n,bad_rate,auc,pr_auc,ks,capture_top_10pct,capture_top_20pct,model
+120790,0.1512,0.6156,0.21,0.1674,0.161,0.2993,tier1_rule_fico_dti
+120790,0.1512,0.6617,0.2424,0.2362,0.1925,0.3452,tier2_woe_scorecard
+120790,0.1512,0.663,0.2423,0.2364,0.193,0.3478,tier3_gbm
+120790,0.1512,0.675,0.2499,0.2561,0.2003,0.3576,platform_sub_grade

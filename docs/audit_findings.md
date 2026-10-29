@@ -109,3 +109,118 @@ Two consequences, both of which the project should own rather than hide:
 - Chunked reads infer different dtypes per chunk (`id` arrives as int in some
   chunks, str in others). Object columns are normalised before the parquet
   write.
+
+---
+
+# Modelling results
+
+Scorecard and models fitted on train (306,462), tuned on validation (120,790),
+evaluated on test (162,236) **once**. Feature set: 14 features surviving the
+IV floor, from 25 candidates.
+
+## 7. The platform benchmark wins standalone — and that is the result
+
+Test set, first and only evaluation:
+
+| Model | AUC | PR-AUC | KS | Capture@10% |
+|---|---:|---:|---:|---:|
+| Tier 1 — FICO + DTI rule | 0.6208 | 0.2074 | 0.1744 | 16.7% |
+| Tier 2 — WOE scorecard | 0.6660 | 0.2433 | 0.2372 | 20.0% |
+| Tier 3 — gradient boosting | 0.6694 | 0.2466 | 0.2455 | 20.2% |
+| **Platform `sub_grade`** | **0.6814** | **0.2515** | **0.2679** | **20.6%** |
+| **Stacked: grade + scorecard** | **0.6928** | **0.2642** | **0.2795** | **21.5%** |
+
+Approved bad rate at matched approval rates (test), versus the platform in
+basis points — negative means better than the platform:
+
+| Approval rate | Scorecard | GBM | **Stacked** |
+|---:|---:|---:|---:|
+| 50% | +66 bp | +57 bp | **−32 bp** |
+| 60% | +61 bp | +45 bp | **−33 bp** |
+| 70% | +32 bp | +23 bp | **−37 bp** |
+| 80% | +19 bp | +10 bp | **−30 bp** |
+| 90% | +12 bp | +9 bp | **−13 bp** |
+
+**Built from application-time data alone, neither the scorecard nor gradient
+boosting beats LendingClub's own grade.** That is the honest finding and it
+should not be buried. The platform had inputs this dataset does not expose —
+the full credit report, its own verification process, and visibility into the
+applicants it declined.
+
+**What does work is adding to the incumbent rather than replacing it.** The
+scorecard carries information the grade does not: stacking the two beats the
+grade alone by **30 to 37 basis points at every approval rate from 50% to 80%**.
+Incremental lift over an existing model is also the question a risk team
+actually asks about a new model, so this is the more useful answer.
+
+The validation-to-test gap is small and the sign never flips — stacked was
+−38/−35/−36/−29/−17 bp on validation and −32/−33/−37/−30/−13 bp on test. The
+result held out of time, which is the only reason it is worth reporting.
+
+### What the chosen policy costs
+
+Stacked policy on test:
+
+| Approval rate | Approved bad rate | Bads avoided | **Goods rejected** |
+|---:|---:|---:|---:|
+| 50% | 7.79% | 73.5% | **45.9%** |
+| 70% | 10.08% | 52.0% | **26.2%** |
+| 90% | 12.83% | 21.5% | **8.0%** |
+
+The goods-rejected column is the one to lead with. At a 70% approval rate the
+policy avoids about half the defaults and turns away **a quarter of the
+customers who would have repaid**. Only 25.5% of declined applicants would
+actually have defaulted. Any presentation that reports bads-avoided without
+this column is selling something.
+
+## 8. Sign-constrained pruning cost 34 basis points
+
+Standard scorecard practice drops any WOE feature whose fitted coefficient is
+non-positive, on the grounds that WOE is already oriented so higher means
+riskier, and a negative coefficient means the feature is cancelling a
+correlated one rather than contributing evidence.
+
+Applied here, iterative sign-constrained pruning removed 14 of 27 features and
+made the policy curve **worse by roughly 34 bp** (validation gap to platform
+widened from +23 bp to +57 bp at a 50% approval rate).
+
+So the sign constraint buys stability and auditability at a measurable cost in
+performance. That trade-off is usually asserted; here it is quantified. The
+shipped model uses the IV floor only, and keeps the sign diagnostic as a
+reported flag rather than an automatic filter.
+
+## 9. Calibration drifts even though the score distribution does not
+
+Score PSI train → test is **0.0023** — the score distribution is essentially
+unchanged. But calibration is systematically off:
+
+| Decile | Predicted | Observed | Gap |
+|---:|---:|---:|---:|
+| 3 | 9.69% | 11.21% | +1.51 pp |
+| 5 | 13.04% | 15.01% | +1.97 pp |
+| 7 | 17.26% | 19.61% | +2.34 pp |
+| 9 | 26.95% | 29.38% | +2.42 pp |
+
+The model under-predicts risk across nearly every decile, because train bad
+rate is 13.25% and test is 14.71%. Ranking survived; levels did not.
+
+**This is the practical lesson of the project.** PSI monitoring alone would
+have reported "stable" and missed it entirely. A policy that sets a threshold
+on *probability* would have silently under-delivered on its promised bad rate,
+while a policy that sets it on *approval rate* — a score quantile — is immune,
+because it never relies on the absolute level being right. That is a concrete
+argument for expressing credit policy as a rate rather than a probability
+cut-off, and it is the kind of thing only out-of-time evaluation surfaces.
+
+## 10. The crude economics say something uncomfortable
+
+At a 70% approval rate on test (113,565 loans, $1.58bn deployed), the
+illustrative calculation returns a net proxy of **$3.4m, or 0.22% of capital
+deployed** — essentially break-even, and that is *before* funding cost,
+servicing cost, and with a flat 20% recovery assumption.
+
+This number should not be quoted as a finding; it is too crude. What it is good
+for is scale discipline: marketplace consumer lending at these rates and this
+loss level ran on thin margins, so a 30 bp improvement in approved bad rate is
+not a rounding error in that business. It also means a resume bullet claiming
+large savings from this project would not survive the first follow-up question.

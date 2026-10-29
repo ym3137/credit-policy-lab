@@ -53,6 +53,23 @@ benchmark is a real opponent, not a straw man — if the scorecard merely matche
 it, that is the honest result, and a project claiming to crush the incumbent on
 this data should be distrusted.
 
+**The platform benchmark wins standalone, and the stack beats it.** On the
+test set — evaluated once — neither the scorecard (AUC 0.666) nor gradient
+boosting (0.669) beats LendingClub's own `sub_grade` (0.681) from
+application-time data alone. The platform had inputs this data does not expose.
+But stacking the scorecard *on top of* the grade beats the grade alone by
+**30–37 basis points of approved bad rate at every approval rate from 50% to
+80%**, and the sign held from validation through to test. Incremental lift over
+the incumbent is also the question a risk team actually asks.
+
+**Calibration drifted even though the score distribution did not.** Score PSI
+train→test is 0.0023 — stable — while predicted bad rate runs 1.5 to 2.4 points
+below observed across deciles, because train bad rate is 13.25% and test is
+14.71%. PSI monitoring alone would have reported no problem. A policy set on a
+probability cut-off would have silently under-delivered; one set on an approval
+*rate* is immune. That is a concrete argument for how to express credit policy,
+and only out-of-time evaluation surfaces it.
+
 The target is also **non-stationary**: bad rate runs 12.3% (2013) to 14.9%
 (2015), with test ~1.5 points above train. Part of any out-of-time decay is the
 population moving rather than the model degrading, and the decay analysis has
