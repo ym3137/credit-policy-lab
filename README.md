@@ -75,6 +75,29 @@ The target is also **non-stationary**: bad rate runs 12.3% (2013) to 14.9%
 population moving rather than the model degrading, and the decay analysis has
 to separate the two.
 
+## The four charts
+
+![Policy curve](reports/figures/01_policy_curve.png)
+
+Same approval rate, four ways of choosing who gets in. The stacked policy sits
+lowest at every point; the FICO + DTI rule a naive analyst would build sits
+highest.
+
+![Cost of tightening](reports/figures/02_cost_of_tightening.png)
+
+The column most portfolio projects omit. Tightening to 50% approval stops 74%
+of defaults and turns away 46% of the customers who would have repaid.
+
+![Calibration](reports/figures/03_calibration.png)
+
+The model ranked correctly and still understated risk, while the drift metric
+said "stable". This is the project's operational finding.
+
+![Selection effect](reports/figures/04_selection_effect.png)
+
+Why every result above is conditional: the approved book contains no one below
+a 660 risk score, and that is where 63% of declined applicants live.
+
 ## What the pipeline does
 
 | Module | Output |
