@@ -1,0 +1,4 @@
+field,approved_n,declined_n,approved_median,declined_median,approved_p10,declined_p10
+risk score / FICO,589488,3259687,687.0,641.0,667.0,534.0
+DTI (%),589486,5891298,17.2,17.2,7.2,0.0
+amount requested,589488,5891298,10000.0,10000.0,4500.0,1600.0

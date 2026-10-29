@@ -311,3 +311,101 @@ The 2018 drift reinforces the same point from the other direction: when the
 population improves, a fixed probability cut-off quietly approves a larger
 share, whereas a rate-based policy keeps volume stable and surfaces the change
 as a shift in realised bad rate, where it can be seen and acted on.
+
+---
+
+# Reject inference and the selection effect
+
+Declined applications scanned: 27,648,741 total; **5,891,298** fall in the
+2012-01 → 2015-12 window.
+
+## 14. The approval rate frames everything else in this repo
+
+Matching denominators matters here, and a first pass got it wrong: comparing
+the 589,488-row modelling sample against all 5.89M declined applications mixes
+a filtered numerator with an unfiltered denominator. The correct comparison
+uses all accepted loans in the window, regardless of term or status.
+
+| | Count |
+|---|---:|
+| Accepted, 2012–2015, all terms | 844,905 |
+| Declined, same window | 5,891,298 |
+| **Approval rate** | **12.54%** |
+
+LendingClub declined **87.5% of applications** — roughly eight applications per
+approval. The modelling sample is 589,488 loans, 69.8% of the accepted book
+(the remainder are 60-month term or unresolved status).
+
+So every model in this repo is fitted on about one eighth of the people who
+applied, after the platform's own filter. It describes risk ordering **within
+an already heavily pre-screened population**, not in the applicant population.
+That single sentence belongs in any discussion of these results.
+
+## 15. The declined population is not a tail of the approved one
+
+Only six fields overlap between the two files, and `Risk_Score` is the only
+risk measure among them (populated on 55% of declined rows).
+
+| Field | Approved median | Declined median | Approved p10 | Declined p10 |
+|---|---:|---:|---:|---:|
+| Risk score / FICO | 687 | 641 | 667 | 534 |
+| DTI (%) | 17.2 | 17.2 | 7.2 | 0.0 |
+| Amount requested | 10,000 | 10,000 | 4,500 | 1,600 |
+
+Score bands tell the real story:
+
+| Band | Approved | Declined |
+|---|---:|---:|
+| ≤ 560 | **0.00%** | 14.01% |
+| 560–600 | **0.00%** | 13.07% |
+| 600–640 | **0.00%** | 21.73% |
+| 640–660 | **0.00%** | 14.26% |
+| 660–680 | 36.14% | 12.76% |
+| 680–700 | 27.60% | 10.00% |
+| 700–740 | 27.05% | 9.92% |
+| 740+ | 9.21% | 4.25% |
+
+**63% of declined applicants sit below 660, where the approved book contains
+literally nobody.** This is a hard cut-off, not a soft preference. The
+scorecard has never observed an applicant in that range, so scoring one there
+is extrapolation, not prediction — and no amount of modelling sophistication
+changes that.
+
+Note also that DTI medians are identical (17.2 both sides), so the decision was
+driven overwhelmingly by score, not by the other shared fields.
+
+## 16. The bound, and why it is reported instead of a correction
+
+With 87.5% of applicants declined, the applicant-pool bad rate depends almost
+entirely on an assumption the data cannot test:
+
+| Assumed declined bad rate | Implied applicant-pool bad rate |
+|---:|---:|
+| 20% | 19.25% |
+| 30% | 28.00% |
+| 40% | 36.74% |
+| 50% | 45.49% |
+| 60% | 54.23% |
+
+Observed bad rate on approved loans is 14.03%. The implied range spans **19% to
+54%** across plausible assumptions — the declined weight is so large that the
+assumption, not the data, drives the answer.
+
+A declined applicant has no outcome. Not a missing one — a non-existent one.
+There is no counterfactual to validate against, so every reject-inference
+method ever published is, on this data, an assumption dressed as an estimate.
+
+**This notebook therefore reports a bound, not a correction.** Three claims are
+defensible:
+
+1. The approved book is 12.5% of applicants, so all results are conditional on
+   passing the platform's filter.
+2. The declined population is materially riskier on the one risk field shared
+   between the files, and 63% of it lies outside the approved book's support
+   entirely.
+3. Any applicant-pool bad rate between roughly 19% and 54% is consistent with
+   what is observable.
+
+Running a standard reject-inference technique and reporting a single corrected
+bad rate would present an assumption as a finding. Declining to do that is the
+result.
