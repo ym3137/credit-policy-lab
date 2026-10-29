@@ -224,3 +224,90 @@ for is scale discipline: marketplace consumer lending at these rates and this
 loss level ran on thin margins, so a 30 bp improvement in approved bad rate is
 not a rounding error in that business. It also means a resume bullet claiming
 large savings from this project would not survive the first follow-up question.
+
+---
+
+# Stability and monitoring
+
+Scorecard fitted on 2012–2014 train, applied to every cohort through 2018-12.
+Drift window: 988,585 loans issued 2016-01 → 2018-12.
+
+## 11. No performance decay in the observable window
+
+| Cohort | Loans | Bad rate | AUC | KS |
+|---|---:|---:|---:|---:|
+| 2012 | 43,470 | 13.58% | 0.6506 | 0.2125 |
+| 2013 | 100,422 | 12.33% | 0.6577 | 0.2333 |
+| 2014 | 162,570 | 13.73% | 0.6570 | 0.2252 |
+| 2015 | 283,026 | 14.89% | 0.6641 | 0.2361 |
+
+Discrimination did not degrade — KS runs 0.213 → 0.236, slightly *up*. The
+retrain flag never fires on this window.
+
+**Caveat that has to travel with this table:** 2012–2014 are the training
+cohorts, so those three rows are in-sample. Only 2015 is held out. The honest
+statement is "no decay detected over four years", not "proven stable".
+
+## 12. The 2018 drift is real population change, not a data artefact
+
+Score PSI against the training baseline:
+
+| Cohort | PSI | |
+|---|---:|---|
+| 2012–2016 | 0.0003 – 0.0050 | stable |
+| 2017 | 0.0185 | stable |
+| **2018** | **0.1006** | **watch** |
+
+By quarter the crossing is visible: 2017Q4 0.0631 → 2018Q1 0.1040 → 2018Q3
+0.1142 → 2018Q4 0.1138.
+
+Feature-level PSI (train → 2018) locates it, and a fill-rate check settles what
+it is:
+
+| Feature | PSI | Fill: train → 2018 | Median: train → 2018 |
+|---|---:|---|---|
+| `percent_bc_gt_75` | 0.3159 | 0.970 → 0.986 | 50.0 → **22.2** |
+| `bc_open_to_buy` | 0.2410 | 0.971 → 0.986 | 3,497 → **7,956** |
+| `inq_last_6mths` | 0.1222 | 1.000 → 1.000 | mean 0.8 → **0.4** |
+| `fico_range_low` | 0.1134 | 1.000 → 1.000 | 690 → **700** |
+
+**Coverage is effectively unchanged on all four, so this is not the
+availability-drift artefact the audit was built to catch.** It is a genuine
+shift in who LendingClub was lending to: the 2018 book carries higher FICO
+(share above 740 doubles, 7.8% → 15.9%), roughly half the bankcard utilisation,
+double the available revolving credit, and half the recent credit inquiries.
+
+The platform moved upmarket. That is a credit-policy decision by the lender,
+and it is exactly the kind of change that invalidates a scorecard trained on
+the older population — the model was fitted on a lower-FICO,
+higher-utilisation book and is being asked to rank a cleaner one.
+
+## 13. PSI would have missed the thing that actually broke
+
+This is the operational conclusion of the project, and it is not the one the
+textbook ordering suggests.
+
+On the **test set**, score PSI train → test was **0.0023** — as stable as a
+number can be. Calibration over the same split was off by **1.5 to 2.4
+percentage points**, under-predicting risk in nine of ten deciles, because
+train bad rate is 13.25% and test is 14.71%.
+
+So a PSI-only monitoring setup reports "all clear" precisely where the model
+has stopped telling the truth about absolute risk. PSI detects *input* shift;
+it is blind to the target moving underneath a stable input distribution.
+
+Two recommendations follow, and both are concrete:
+
+1. **Monitor observed-versus-predicted bad rate by score band** on a rolling
+   basis, alongside PSI rather than instead of it. Calibration drift is the
+   failure mode PSI structurally cannot see.
+2. **Express the approval policy as a rate, not a probability cut-off.** A
+   score-quantile policy holds approved volume fixed by construction and is
+   immune to calibration drift. A probability threshold silently changes
+   approved volume the moment calibration moves — which here would have meant
+   approving more than intended while believing the opposite.
+
+The 2018 drift reinforces the same point from the other direction: when the
+population improves, a fixed probability cut-off quietly approves a larger
+share, whereas a rate-based policy keeps volume stable and surfaces the change
+as a shift in realised bad rate, where it can be seen and acted on.

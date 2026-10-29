@@ -1,0 +1,13 @@
+feature,psi_2018,verdict
+percent_bc_gt_75,0.3159,investigate
+bc_open_to_buy,0.241,watch
+inq_last_6mths,0.1222,watch
+fico_range_low,0.1134,watch
+total_rev_hi_lim,0.0852,stable
+mort_acc,0.0642,stable
+dti,0.0468,stable
+annual_inc,0.0196,stable
+tot_cur_bal,0.0129,stable
+acc_open_past_24mths,0.0127,stable
+mths_since_recent_inq,0.0114,stable
+avg_cur_bal,0.0051,stable
