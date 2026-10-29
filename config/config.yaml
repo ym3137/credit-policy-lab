@@ -1,0 +1,63 @@
+# Credit Policy Lab — central configuration
+# Every窗口/阈值 decision lives here so notebooks stay thin and reproducible.
+
+paths:
+  raw_accepted: data/raw/accepted_2007_to_2018Q4.csv.gz
+  raw_rejected: data/raw/rejected_2007_to_2018Q4.csv.gz
+  interim: data/interim
+  processed: data/processed
+  reports: reports
+
+# ---------------------------------------------------------------- sampling
+# Performance window: a 36-month loan needs 36 months + buffer after issuance
+# before its outcome is known. Data ends 2018-12, so loans issued through
+# 2015-12 have completed their full term.
+sample:
+  term_months: 36                 # restrict to one term so the window is uniform
+  issue_start: "2012-01-01"
+  issue_end:   "2015-12-31"
+  data_cutoff: "2018-12-31"       # last month present in the raw file
+  buffer_months: 6                # extra months for charge-off recognition lag
+
+# ---------------------------------------------------------------- splits
+# Out-of-time, never random. Validation is used for binning/threshold tuning;
+# test is touched exactly once, at the end.
+splits:
+  train: ["2012-01-01", "2014-12-31"]
+  valid: ["2015-01-01", "2015-06-30"]
+  test:  ["2015-07-01", "2015-12-31"]
+  # Unlabelled drift-monitoring window (score distribution only, no target)
+  drift: ["2016-01-01", "2018-12-31"]
+
+# ---------------------------------------------------------------- labels
+labels:
+  bad:
+    - "Charged Off"
+    - "Default"
+    - "Does not meet the credit policy. Status:Charged Off"
+  good:
+    - "Fully Paid"
+    - "Does not meet the credit policy. Status:Fully Paid"
+  # Anything below is censored — outcome not yet observable. NEVER map to good.
+  censored:
+    - "Current"
+    - "In Grace Period"
+    - "Late (16-30 days)"
+    - "Late (31-120 days)"
+
+# ---------------------------------------------------------------- binning
+binning:
+  max_bins: 6
+  min_bin_frac: 0.05        # no bin smaller than 5% of the sample
+  enforce_monotonic: true
+  iv_floor: 0.02            # below this a feature carries no signal
+  iv_leakage_alarm: 0.50    # above this, suspect leakage before celebrating
+
+# ---------------------------------------------------------------- policy
+policy:
+  approval_rates: [0.50, 0.60, 0.70, 0.80, 0.90]
+  # Recovery rate assumption for the rough economics module. This is an
+  # ASSUMPTION, not a measured value — sensitivity-test it, don't trust it.
+  assumed_recovery_rate: 0.20
+
+random_seed: 42
