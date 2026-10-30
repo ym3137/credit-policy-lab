@@ -2,8 +2,9 @@ data/raw/*
 data/interim/*
 data/processed/*
 !data/**/.gitkeep
-reports/figures/*
-!reports/figures/.gitkeep
+# Figures ARE committed: the README embeds them, so excluding them here
+# would leave broken images on GitHub. Only scratch exports are ignored.
+reports/figures/*.tmp.*
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
